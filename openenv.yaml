@@ -1,0 +1,71 @@
+name: traffic-signal-env
+version: "1.0.0"
+description: >
+  Smart-city adaptive traffic signal control benchmark.
+  An agent observes camera-like image frames of intersections (with
+  weather noise, partial observability, and emergency vehicle overlays)
+  plus compact structured metadata, then selects traffic light phases
+  across one or more intersections to minimise congestion, reduce
+  average waiting time, and guarantee fast emergency-vehicle passage.
+author: OpenENV Submission
+license: MIT
+tags:
+  - traffic
+  - signal-control
+  - image-observation
+  - emergency-priority
+  - multi-intersection
+  - smart-city
+
+environment:
+  entry_point: env.traffic_env:TrafficSignalEnv
+  observation_space: image_plus_metadata
+  action_space: discrete
+  reward_type: dense_multi_objective
+
+tasks:
+  - id: easy
+    name: "Single Intersection — Normal Traffic"
+    description: >
+      One intersection, four lanes, normal vehicle flow only.
+      Objective: minimise average waiting time and queue length.
+    entry_point: tasks.task_easy:make_env
+    grader: graders.easy_grader:EasyGrader
+    max_steps: 300
+    seed: 42
+
+  - id: medium
+    name: "2×2 Grid — Congestion Propagation"
+    description: >
+      Four intersections arranged in a 2×2 grid. Congestion propagates
+      between neighbouring nodes. Objective: maximise throughput and
+      prevent spillback across the grid.
+    entry_point: tasks.task_medium:make_env
+    grader: graders.medium_grader:MediumGrader
+    max_steps: 400
+    seed: 42
+
+  - id: hard
+    name: "Emergency-Aware Control with Partial Observability"
+    description: >
+      Four intersections with emergency vehicle spikes, dynamic demand,
+      weather / visibility noise, and partial observability (cameras
+      occasionally occluded). Objective: guarantee emergency-vehicle
+      prioritisation (ambulance > fire > police) while keeping the
+      broader system stable and fair.
+    entry_point: tasks.task_hard:make_env
+    grader: graders.hard_grader:HardGrader
+    max_steps: 500
+    seed: 42
+
+inference:
+  script: inference.py
+  env_vars:
+    - API_BASE_URL
+    - MODEL_NAME
+    - HF_TOKEN
+
+deployment:
+  dockerfile: Dockerfile
+  port: 7860
+  framework: fastapi

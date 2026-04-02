@@ -244,6 +244,25 @@ async def reset_env(request: Optional[ResetRequest] = None) -> JSONResponse:
     _task_id = request.task_id
     seed = request.seed
 
+    if _task_id == "easy":
+        _env = make_easy(seed=seed)
+    elif _task_id == "medium":
+        _env = make_medium(seed=seed)
+    elif _task_id == "hard":
+        _env = make_hard(seed=seed)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown task_id: {_task_id}")
+
+    obs = _env.reset(seed=seed)
+    return JSONResponse({
+        "status": "ok",
+        "task_id": _task_id,
+        "seed": seed,
+        "observation": _obs_to_dict(obs),
+        "action_space_size": _env.action_space_size,
+        "n_intersections": _env.n_intersections,
+    })
+
 
 @app.post("/step")
 async def step(req: StepRequest) -> JSONResponse:

@@ -230,27 +230,19 @@ async def root():
 
 
 @app.post("/reset")
-async def reset(req: ResetRequest) -> JSONResponse:
-    global _env, _task_id
-    _task_id = req.task_id
-    if req.task_id == "easy":
-        _env = make_easy(seed=req.seed)
-    elif req.task_id == "medium":
-        _env = make_medium(seed=req.seed)
-    elif req.task_id == "hard":
-        _env = make_hard(seed=req.seed)
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown task_id: {req.task_id}")
+async def reset_env(request: Optional[ResetRequest] = None) -> JSONResponse:
+    """Reset environment to initial state.
 
-    obs = _env.reset(seed=req.seed)
-    return JSONResponse({
-        "status": "ok",
-        "task_id": req.task_id,
-        "seed": req.seed,
-        "observation": _obs_to_dict(obs),
-        "action_space_size": _env.action_space_size,
-        "n_intersections": _env.n_intersections,
-    })
+    Accepts optional `task_id` and `seed` in request body.
+    If no body, defaults to `easy` task and seed `42`.
+    """
+    global _env, _task_id
+
+    if request is None:
+        request = ResetRequest()
+
+    _task_id = request.task_id
+    seed = request.seed
 
 
 @app.post("/step")

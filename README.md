@@ -1,3 +1,13 @@
+---
+title: Traffic Signal Env
+emoji: 🚦
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🚦 TrafficSignalEnv
 
 **Smart-city adaptive traffic signal control benchmark — OpenEnv compliant**

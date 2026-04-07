@@ -294,22 +294,44 @@ class HuggingFaceAdapter(LLMAdapter):
 # ---------------------------------------------------------------------------
 
 _DEFAULT_OAI_BASE  = "https://openrouter.ai/api/v1"
-_DEFAULT_OAI_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+_DEFAULT_OAI_MODEL = "gpt-3.5-turbo"
 
 
 def build_adapter(verbose: bool = True) -> Optional[LLMAdapter]:
     """Build the appropriate LLM adapter from environment variables.
 
-    Resolution order:
-    1. OLLAMA_MODEL set  → OpenAICompatibleAdapter (localhost:11434)
-    2. MODEL_PROVIDER=hf → HuggingFaceAdapter
-    3. MODEL_PROVIDER=openai or unset → OpenAICompatibleAdapter
-    4. Neither key nor URL available → return None (fallback to heuristic)
+    PRIORITY ORDER (grader environment always wins):
+    1. API_BASE_URL + API_KEY both set → grader/LiteLLM proxy (HIGHEST PRIORITY)
+    2. OLLAMA_MODEL set               → local Ollama (localhost:11434)
+    3. MODEL_PROVIDER=hf              → HuggingFaceAdapter
+    4. MODEL_PROVIDER=openai + key    → OpenAICompatibleAdapter
+    5. Nothing configured             → return None (rule-based fallback)
 
-    Returns None if the provider cannot be configured — callers should
-    then use the rule-based fallback.
+    The grader injects API_BASE_URL and API_KEY as environment variables.
+    load_dotenv(override=False) ensures they are never overridden by .env.
     """
-    # --- Ollama shortcut ---
+    # ── GRADER PATH (highest priority) ──────────────────────────────────
+    # When the hackathon grader runs inference, it sets both API_BASE_URL
+    # and API_KEY. Detect this and build the adapter immediately.
+    grader_url = os.environ.get("API_BASE_URL", "").strip()
+    grader_key = os.environ.get("API_KEY", "").strip()
+
+    if grader_url and grader_key:
+        model = os.environ.get("MODEL_NAME", _DEFAULT_OAI_MODEL).strip()
+        adapter = OpenAICompatibleAdapter(
+            base_url=grader_url,
+            api_key=grader_key,
+            model_name=model,
+        )
+        if verbose:
+            print(
+                f"[LLMAdapter] ✔ Grader proxy detected → "
+                f"model={model}  base_url={grader_url}",
+                flush=True,
+            )
+        return adapter
+
+    # ── LOCAL: Ollama shortcut ───────────────────────────────────────────
     ollama_model = os.environ.get("OLLAMA_MODEL", "").strip()
     if ollama_model:
         adapter = OpenAICompatibleAdapter(
@@ -323,7 +345,7 @@ def build_adapter(verbose: bool = True) -> Optional[LLMAdapter]:
 
     provider = os.environ.get("MODEL_PROVIDER", "").strip().lower()
 
-    # --- HuggingFace provider ---
+    # ── HuggingFace provider ─────────────────────────────────────────────
     if provider == "hf":
         hf_token = (
             os.environ.get("HF_TOKEN", "")
@@ -368,35 +390,15 @@ def build_adapter(verbose: bool = True) -> Optional[LLMAdapter]:
             )
         return adapter
 
-    # --- OpenAI-compatible provider (default) ---
-    # Read API key — grader injects API_KEY; also support OPENROUTER_API_KEY / HF_TOKEN
+    # ── OpenAI-compatible provider (default / local testing) ────────────
     api_key = (
-        os.environ.get("API_KEY", "")            # grader-injected (primary)
-        or os.environ.get("OPENROUTER_API_KEY", "")
+        os.environ.get("OPENROUTER_API_KEY", "")
         or os.environ.get("HF_TOKEN", "")
         or os.environ.get("HUGGING_FACE_TOKEN", "")
         or os.environ.get("OPENAI_API_KEY", "")
     ).strip()
-    base_url  = os.environ.get("API_BASE_URL", "").strip() or _DEFAULT_OAI_BASE
-    model     = os.environ.get("MODEL_NAME", _DEFAULT_OAI_MODEL).strip()
-
-    if not base_url:
-        if verbose:
-            print(
-                "[LLMAdapter] ⚠  API_BASE_URL not set; defaulting to OpenRouter.",
-                flush=True,
-            )
-        base_url = _DEFAULT_OAI_BASE
-
-    if not api_key:
-        if "localhost" not in base_url and "127.0.0.1" not in base_url:
-            if verbose:
-                print(
-                    "[LLMAdapter] ⚠  No API key found for non-local endpoint. "
-                    "Set OPENROUTER_API_KEY or HF_TOKEN.",
-                    flush=True,
-                )
-            return None
+    base_url = os.environ.get("API_BASE_URL", "").strip() or _DEFAULT_OAI_BASE
+    model    = os.environ.get("MODEL_NAME", _DEFAULT_OAI_MODEL).strip()
 
     adapter = OpenAICompatibleAdapter(
         base_url=base_url,

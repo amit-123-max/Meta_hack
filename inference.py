@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from dotenv import load_dotenv
-load_dotenv(override=False)  # CRITICAL: never override grader-injected env vars
+load_dotenv()  # CRITICAL: never override grader-injected env vars
 
 # ---------------------------------------------------------------------------
 # Ensure project root is on path

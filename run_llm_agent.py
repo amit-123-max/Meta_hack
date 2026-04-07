@@ -44,7 +44,7 @@ from llm_agent.llm_adapter import build_adapter
 
 def _resolve_api_key() -> str:
     return (
-        os.environ.get("OPENROUTER_API_KEY", "")
+        os.environ.get("API_KEY", "")
         or os.environ.get("HF_TOKEN", "")
         or os.environ.get("HUGGING_FACE_TOKEN", "")
     )

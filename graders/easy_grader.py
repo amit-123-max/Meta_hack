@@ -1,98 +1,193 @@
 """Easy-task grader — single intersection, normal traffic.
 
-Calibration grounded in actual arrival physics:
-  - 4 lanes × λ=0.30 = 1.2 vehicles/step total arriving
-  - Throughput ≤ arrival → realistic max TP ≈ 1.4 vehicles/step
-  - Avg queue per lane ≈ 1.5–4.0 for a good agent (low arrival rate)
-  - Expected baseline score: ~0.62–0.70 (highest of the three tasks,
-    because this is the simplest — single intersection, no emergencies)
+Architecture: hybrid gate × (process + outcome)
+================================================
 
-Score formula:
-  score = 0.45 * throughput_score
-        + 0.40 * queue_score
-        - 0.15 * switch_penalty
+  final_score = gate_factor
+                × (W_PROCESS * mean(process_scores)
+                   + W_OUTCOME * outcome_score)
+
+  gate_factor = safety_gate(all_red_abuse, starvation, oscillation)
+              × anti_exploit_penalty
+
+  outcome_score = weighted_sum(
+      0.45 * throughput_score,   # primary — must discharge vehicles
+      0.30 * queue_score,        # worst-lane tail-risk
+      0.15 * improvement_score,  # late-episode progress
+      0.10 * smoothness_score,   # anti-oscillation
+  )
+
+Safety gates (multiplicative)
+------------------------------
+  ALL_RED rate > 60% → gate = 0.20
+  ALL_RED rate > 40% → gate = 0.55
+  Starvation fraction > 0%  → gate ×= 0.55 (one dominant phase > 85%)
+  Oscillation rate > 70%    → gate ×= 0.50
+
+Process / outcome mix
+---------------------
+  W_PROCESS = 0.30   (local per-step action quality)
+  W_OUTCOME = 0.70   (trajectory-level outcome metrics)
+
+Calibration
+-----------
+  Uses calibrated bounds from calibration dict if available.
+  Static defaults:
+    tp    : [0.0, 4.0]   (single intersection, discharge=3, 2 green lanes)
+    queue : [0.0, 8.0]
+
+Target ranges
+-------------
+  Rule-based baseline: ≈ 0.45–0.65
+  Good LLM policy:     ≈ 0.60–0.78
+  Random policy:       ≈ 0.20–0.40
+  Score always in [0, 1].
 """
 from __future__ import annotations
 
 import statistics
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from graders.base_grader import BaseGrader
 
-# --------------------------------------------------------------------------
-# Per-step calibration — grounded in arrival physics not theoretical max
-# --------------------------------------------------------------------------
-# Arrival: 4 lanes × λ=0.30 = 1.2 vehicles/step across the intersection.
-# A perfect agent discharges all arrivals → TP ≈ 1.2/step.
-# We set _GOOD_TP = 1.0 (achievable) and _BAD_TP = 0 (nothing moves).
-_TP_GOOD     = 1.0    # realistic well-run throughput
-_TP_NORM_MAX = 1.4    # absolute cap for normalisation (slightly above good)
+# Normalization defaults (used when calibration is absent)
+_TP_DEFAULT_LO    = 0.0
+_TP_DEFAULT_HI    = 1.5    # realistic upper bound: arrival_rate=0.30 × 4 lanes ≈ 1.2/step
+_QUEUE_DEFAULT_LO = 0.0
+_QUEUE_DEFAULT_HI = 8.0
+_SWITCH_DEFAULT_HI = 0.25  # switch rate reference
 
-# Average queue per lane: with λ=0.30, phases ~10s each, queue stays low.
-# Good agent: ~1.5–2.5 vehicles/lane. Bad agent: ≥6 vehicles/lane.
-_QUEUE_GOOD  = 2.0    # target average queue per lane
-_QUEUE_MAX   = 7.0    # represents a badly congested lane
+# Process / outcome blend weights
+W_PROCESS = 0.30
+W_OUTCOME = 0.70
 
-# Switch rate: number of phase changes / total steps.
-# Oscillating every step → 1.0; stable control → near 0.
-_SWITCH_RATE_MAX = 0.20   # 1 switch per 5 steps = clearly oscillatory
-
-W_TP     = 0.45
-W_QUEUE  = 0.40
-W_SWITCH = 0.15
+# Outcome sub-weights (must sum to 1.0)
+W_TP      = 0.45
+W_QUEUE   = 0.30
+W_IMPROVE = 0.15
+W_SMOOTH  = 0.10
 
 
 class EasyGrader(BaseGrader):
     """Deterministic grader for Task 1 (Easy).
 
-    Expected score range with rule-based baseline: ~0.62–0.70.
-    This should be the HIGHEST score of the three tasks.
+    Target baseline (rule-based): ≈ 0.45–0.65.
+    Exploit-resistant via safety gate + anti-exploit layer.
     """
 
     def grade(self, trajectory: List[Dict[str, Any]]) -> float:
         if not trajectory:
             return 0.0
 
-        throughputs: List[float] = []
-        avg_queues:  List[float] = []
-        phase_counts: Dict[int, int] = {}
-
-        for step in trajectory:
-            snap = step.get("state_snapshot", {})
-            throughputs.append(float(snap.get("global_throughput", 0)))
-            avg_queues.append(float(snap.get("global_avg_wait", _QUEUE_MAX)))
-
-            for inter in snap.get("intersections", []):
-                p = inter.get("phase", -1)
-                phase_counts[p] = phase_counts.get(p, 0) + 1
-
         n_steps = len(trajectory)
+        n_inters = 1  # Easy = single intersection
 
-        # --- Throughput: normalise against physics-based ceiling ---
-        avg_tp   = statistics.mean(throughputs) if throughputs else 0.0
-        tp_score = self._normalise(avg_tp, 0.0, _TP_NORM_MAX)
+        # ------------------------------------------------------------------
+        # 1. Safety gate
+        # ------------------------------------------------------------------
+        all_red = self._all_red_rate(trajectory, n_inters)
+        osc     = self._oscillation_rate(trajectory)
 
-        # --- Queue: lower is better; 0 queue → perfect, _QUEUE_MAX → 0 ---
-        mean_queue  = statistics.mean(avg_queues) if avg_queues else _QUEUE_MAX
-        queue_score = self._invert(self._normalise(mean_queue, 0.0, _QUEUE_MAX))
+        gate = 1.0
+        if all_red > 0.60:
+            gate *= 0.20
+        elif all_red > 0.40:
+            gate *= 0.55
+        elif all_red > 0.20:
+            gate *= 0.80
 
-        # --- Switch penalty: final total switches / steps = rate ---
-        final_switches = int(
+        # Starvation gate for easy (single intersection, short episodes).
+        # Threshold raised to 0.92 — with Poisson arrivals over ~20 steps,
+        # one direction naturally dominates >85% of steps for a good policy.
+        # We only penalize true lock-in (>92%) where both directions are never
+        # balanced AND queues on the ignored side are building up.
+        phase_counts: Dict[int, int] = {}
+        for step_data in trajectory:
+            snap = step_data.get("state_snapshot", {})
+            for inter in snap.get("intersections", []):
+                ph = inter.get("phase", -1)
+                phase_counts[ph] = phase_counts.get(ph, 0) + 1
+        if phase_counts:
+            total_ph = max(sum(phase_counts.values()), 1)
+            dominant_frac = max(phase_counts.values()) / total_ph
+            if dominant_frac > 0.92:   # truly degenerate lock-in
+                gate *= 0.72           # soft penalty (was 0.55 — too harsh)
+
+        if osc > 0.70:
+            gate *= 0.50
+        elif osc > 0.50:
+            gate *= 0.75
+
+        # Anti-exploit multiplicative factor
+        exploit_penalty = self._anti_exploit_penalty(trajectory, n_inters)
+        gate = max(0.0, min(1.0, gate * exploit_penalty))
+
+        if gate == 0.0:
+            return 0.0
+
+        # ------------------------------------------------------------------
+        # 2. Process score (per-step local action quality)
+        # ------------------------------------------------------------------
+        process_scores = self._compute_process_scores(trajectory, n_inters)
+        process_score  = self._robust_mean(process_scores, default=0.5)
+
+        # ------------------------------------------------------------------
+        # 3. Outcome score
+        # ------------------------------------------------------------------
+        throughputs:  List[float] = []
+        worst_queues: List[float] = []
+
+        for step_data in trajectory:
+            snap = step_data.get("state_snapshot", {})
+            throughputs.append(float(snap.get("global_throughput", 0.0)))
+
+            lane_queues: List[float] = []
+            for inter in snap.get("intersections", []):
+                for q in inter.get("queues", []):
+                    lane_queues.append(float(q))
+            q_hi = self._get_bounds("queue", _QUEUE_DEFAULT_LO, _QUEUE_DEFAULT_HI)[1]
+            worst_q = max(lane_queues) if lane_queues else q_hi
+            worst_queues.append(worst_q)
+
+        # Calibrated throughput normalization
+        tp_lo, tp_hi = self._get_bounds("tp", _TP_DEFAULT_LO, _TP_DEFAULT_HI)
+        tp_score = self._normalise(self._robust_mean(throughputs, 0.0), tp_lo, tp_hi)
+
+        # Queue score (lower is better)
+        q_lo, q_hi = self._get_bounds("queue", _QUEUE_DEFAULT_LO, _QUEUE_DEFAULT_HI)
+        queue_score = self._invert(
+            self._normalise(self._robust_mean(worst_queues, q_hi), q_lo, q_hi)
+        )
+
+        # Improvement score: late-episode vs early-episode throughput
+        half = max(n_steps // 2, 1)
+        early_tp = self._safe_mean(throughputs[:half])
+        late_tp  = self._safe_mean(throughputs[half:]) if n_steps > half else early_tp
+        # Centered at 0.5; clamped [0,1]
+        improve_score = max(0.0, min(1.0,
+            (late_tp - early_tp) / max(tp_hi - tp_lo, 1e-6) + 0.5
+        ))
+
+        # Smoothness: penalise high switch rate
+        final_sw = int(
             trajectory[-1].get("state_snapshot", {}).get("phase_switches", 0)
         )
-        switch_rate    = final_switches / max(n_steps, 1)
-        switch_penalty = self._normalise(switch_rate, 0.0, _SWITCH_RATE_MAX)
-
-        # --- Degenerate guard: one phase dominates >92% → starvation ---
-        if phase_counts:
-            dominant_frac = max(phase_counts.values()) / max(sum(phase_counts.values()), 1)
-            if dominant_frac > 0.92:
-                tp_score    *= 0.6
-                queue_score *= 0.6
-
-        score = (
-            W_TP    * tp_score
-            + W_QUEUE * queue_score
-            - W_SWITCH * switch_penalty
+        switch_rate = final_sw / max(n_steps, 1)
+        smooth_score = self._invert(
+            self._normalise(switch_rate, 0.0, _SWITCH_DEFAULT_HI)
         )
-        return float(max(0.0, min(1.0, score)))
+
+        outcome_score = (
+            W_TP      * tp_score
+            + W_QUEUE   * queue_score
+            + W_IMPROVE * improve_score
+            + W_SMOOTH  * smooth_score
+        )
+        outcome_score = max(0.0, min(1.0, outcome_score))
+
+        # ------------------------------------------------------------------
+        # 4. Combined score
+        # ------------------------------------------------------------------
+        raw = W_PROCESS * process_score + W_OUTCOME * outcome_score
+        final = gate * raw
+        return float(max(0.0, min(1.0, final)))

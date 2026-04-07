@@ -42,7 +42,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)  # Never override env vars injected by the grader
 
 
 # ---------------------------------------------------------------------------
@@ -369,12 +369,15 @@ def build_adapter(verbose: bool = True) -> Optional[LLMAdapter]:
         return adapter
 
     # --- OpenAI-compatible provider (default) ---
+    # Read API key — grader injects API_KEY; also support OPENROUTER_API_KEY / HF_TOKEN
     api_key = (
-        os.environ.get("OPENROUTER_API_KEY", "")
+        os.environ.get("API_KEY", "")            # grader-injected (primary)
+        or os.environ.get("OPENROUTER_API_KEY", "")
         or os.environ.get("HF_TOKEN", "")
         or os.environ.get("HUGGING_FACE_TOKEN", "")
+        or os.environ.get("OPENAI_API_KEY", "")
     ).strip()
-    base_url  = os.environ.get("API_BASE_URL", _DEFAULT_OAI_BASE).strip()
+    base_url  = os.environ.get("API_BASE_URL", "").strip() or _DEFAULT_OAI_BASE
     model     = os.environ.get("MODEL_NAME", _DEFAULT_OAI_MODEL).strip()
 
     if not base_url:

@@ -35,7 +35,7 @@ from typing import Any, Deque, Dict, List, Optional
 import numpy as np
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)  # Never override grader-injected env vars
 
 from llm_agent.llm_adapter import LLMAdapter, build_adapter
 from llm_agent.memory import AgentMemory

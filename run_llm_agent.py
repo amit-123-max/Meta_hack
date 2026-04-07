@@ -36,7 +36,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=False)  # Never override grader-injected env vars
 
 from llm_agent.agent import LLMAgent, llm_health_check
 from llm_agent.llm_adapter import build_adapter

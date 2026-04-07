@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=False)  # CRITICAL: never override grader-injected env vars
 
 # ---------------------------------------------------------------------------
 # Ensure project root is on path
@@ -78,22 +78,22 @@ def _llm_choose_action(
         f"Metadata shape={obs_meta.shape}: {meta_str}. "
         "Each row: [q_N,q_S,q_E,q_W, phase, phase_timer, yellow_rem, "
         "emergency_type, emergency_lane, weather, spillback]. "
-        "Choose phase for each intersection: 0=NS_GREEN, 1=EW_GREEN, 2=ALL_RED. "
-        "If emergency_type>0, serve its lane. "
-        f"Reply with exactly {n_intersections} comma-separated integers (0, 1, or 2)."
+        "Choose phase for each intersection: 0=NS_GREEN, 1=EW_GREEN. "
+        "Serve the direction with the highest total queue. "
+        f"Reply with exactly {n_intersections} comma-separated integers (0 or 1)."
         + fb_str
     )
 
     try:
         text = adapter.complete(
-            system="Output ONLY comma-separated integers 0-2. No words.",
+            system="Output ONLY comma-separated integers 0 or 1. No words.",
             user=prompt,
             max_tokens=32,
             temperature=0.0,
         )
         if text is None:
             return [0] * n_intersections
-        phases = [int(x.strip()) for x in re.findall(r"[0-2]", text)]
+        phases = [int(x.strip()) for x in re.findall(r"[01]", text)]
         phases = (phases + [0] * n_intersections)[:n_intersections]
         return phases
     except Exception as exc:
@@ -131,9 +131,12 @@ def run_task(
         max_phase_steps=env.cfg.sim.phase_duration_max,
     )
 
-    # LLM adapter (provider-agnostic)
+    # LLM adapter — auto-enable when grader injects API_BASE_URL, or use_llm flag set
+    _grader_url = os.environ.get("API_BASE_URL", "").strip()
+    _use_llm = use_llm or bool(_grader_url)
+
     adapter: Optional[LLMAdapter] = None
-    if use_llm:
+    if _use_llm:
         adapter = build_adapter(verbose=verbose)
         if adapter is None:
             print("[WARN] No LLM adapter available — using rule-based agent.", flush=True)
@@ -232,9 +235,11 @@ def main() -> None:
     start_time = time.time()
 
     for task_id in tasks:
+        # Auto-detect LLM mode: use if --llm flag OR API_BASE_URL env var is set
+        _auto_llm = args.llm or bool(os.environ.get("API_BASE_URL", "").strip())
         score = run_task(
             task_id=task_id,
-            use_llm=args.llm,
+            use_llm=_auto_llm,
             seed=args.seed,
             verbose=True,
         )

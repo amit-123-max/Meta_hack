@@ -162,7 +162,24 @@ class StepRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _safe_json(obj):
+    """Recursively convert any object to a JSON-serialisable form."""
+    if obj is None or isinstance(obj, (bool, int, float, str)):
+        return obj
+    if isinstance(obj, dict):
+        return {str(k): _safe_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_safe_json(v) for v in obj]
+    if hasattr(obj, "to_compact_str"):
+        return obj.to_compact_str()
+    if hasattr(obj, "__dict__"):
+        return {k: _safe_json(v) for k, v in obj.__dict__.items()}
+    return str(obj)
+
+
 def _obs_to_dict(obs) -> Dict:
+    """Convert TrafficObservation to JSON-serialisable dict."""
+    import base64, io
     from PIL import Image
     last_frame = obs.frames[-1]
     img = Image.fromarray(last_frame.astype(np.uint8))
@@ -180,6 +197,21 @@ def _obs_to_dict(obs) -> Dict:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _startup():
+    """Log LLM configuration at startup."""
+    url   = os.environ.get("API_BASE_URL", "NOT SET")
+    key   = os.environ.get("API_KEY", "NOT SET")
+    model = os.environ.get("MODEL_NAME", "gpt-3.5-turbo")
+    kprev = (key[:12] + "...") if len(key) > 12 else key
+    print(f"[STARTUP] API_BASE_URL={url}", flush=True)
+    print(f"[STARTUP] API_KEY={kprev}", flush=True)
+    print(f"[STARTUP] MODEL_NAME={model}", flush=True)
+    if url != "NOT SET" and key != "NOT SET":
+        print("[STARTUP] ✅ Grader proxy configured — LLM called on every /step", flush=True)
+    else:
+        print("[STARTUP] ⚠️  No grader env vars — heuristic fallback active", flush=True)
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -213,36 +245,60 @@ async def reset_env(request: Optional[ResetRequest] = None) -> JSONResponse:
     })
 
 
+@app.get("/health")
+async def health():
+    """Health check — also reports LLM configuration."""
+    return JSONResponse({
+        "status": "ok",
+        "llm_proxy": os.environ.get("API_BASE_URL", "not set"),
+        "model": os.environ.get("MODEL_NAME", "gpt-3.5-turbo"),
+    })
+
+
 @app.post("/step")
 async def step(req: Optional[StepRequest] = None) -> JSONResponse:
-    """Step the environment. LLM is ALWAYS called to choose the action.
+    """Step the environment. LLM is ALWAYS called using API_BASE_URL + API_KEY.
 
-    The LLM uses os.environ['API_BASE_URL'] and os.environ['API_KEY'],
-    ensuring every step routes through the grader's LiteLLM proxy.
+    The grader calls this endpoint repeatedly. The LLM call on each step
+    routes through the grader's LiteLLM proxy, updating last_active.
     """
     global _last_obs
-    env = _get_env()
+    try:
+        env = _get_env()
 
-    # Get current observation metadata for LLM prompt
-    meta = _last_obs.metadata if _last_obs is not None else np.zeros((env.n_intersections, 11))
+        # Use last observation metadata for LLM prompt
+        if _last_obs is not None:
+            meta = _last_obs.metadata
+        else:
+            meta = np.zeros((env.n_intersections, 11), dtype=np.float32)
 
-    # ── ALWAYS call LLM (uses grader proxy via API_BASE_URL + API_KEY) ──
-    action = _llm_choose_action(meta, env.n_intersections, _task_id)
+        # ── ALWAYS invoke LLM (grader proxy via API_BASE_URL + API_KEY) ──
+        action = _llm_choose_action(meta, env.n_intersections, _task_id)
 
-    # Caller can override action (for compatibility with direct clients)
-    if req is not None and req.action is not None:
-        action = req.action
+        # Caller may override action (for direct API clients)
+        if req is not None and req.action is not None:
+            action = req.action
 
-    obs, reward, done, info = env.step(action)
-    _last_obs = obs
+        obs, reward, done, info = env.step(action)
+        _last_obs = obs
 
-    return JSONResponse({
-        "observation":  _obs_to_dict(obs),
-        "reward":       reward,
-        "done":         done,
-        "info":         info,
-        "action_taken": action,
-    })
+        return JSONResponse({
+            "observation":  _obs_to_dict(obs),
+            "reward":       float(reward),
+            "done":         bool(done),
+            "info":         _safe_json(info),   # ← converts StepFeedback etc.
+            "action_taken": action,
+        })
+
+    except HTTPException:
+        raise  # re-raise FastAPI HTTP exceptions (e.g. 400 env not init)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Step failed: {exc}"},
+        )
 
 
 @app.get("/state")

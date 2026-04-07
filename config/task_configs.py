@@ -15,7 +15,7 @@ def easy_config() -> EnvConfig:
         include_metadata=True,
         task_id="easy",
         sim=SimConfig(
-            max_steps=300,
+            max_steps=20,            # capped for LLM efficiency
             arrival_rate_base=0.30,
             arrival_rate_noise=0.10,
             emergency_prob_per_step=0.0,
@@ -37,7 +37,7 @@ def medium_config() -> EnvConfig:
         include_metadata=True,
         task_id="medium",
         sim=SimConfig(
-            max_steps=400,
+            max_steps=20,            # capped for LLM efficiency
             arrival_rate_base=0.40,
             arrival_rate_noise=0.15,
             emergency_prob_per_step=0.0,
@@ -61,7 +61,7 @@ def hard_config() -> EnvConfig:
         include_metadata=True,
         task_id="hard",
         sim=SimConfig(
-            max_steps=500,
+            max_steps=20,            # capped for LLM efficiency
             arrival_rate_base=0.45,
             arrival_rate_noise=0.20,
             emergency_prob_per_step=0.015,    # ~1 emergency per ~67 steps

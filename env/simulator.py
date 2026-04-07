@@ -45,6 +45,8 @@ class _Lane:
     emergency: EmergencyType = EmergencyType.NONE
     emergency_timer: int = 0       # steps until emergency vehicle clears
     starvation_timer: int = 0      # steps without any green
+    # Track emergency arrival step for accurate latency measurement
+    emergency_arrival_step: int = -1
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +66,7 @@ class _Intersection:
     total_throughput: int = 0
     total_wait: float = 0.0
     phase_switches: int = 0
+    all_red_steps: int = 0  # total steps spent in ALL_RED phase
 
     @property
     def n_lanes(self) -> int:
@@ -84,6 +87,11 @@ class TrafficSimulator:
     - Congestion propagation / spillback between neighbouring intersections
     - Weather state machine
     - Exposes full state and per-intersection lane states
+
+    Emergency delay fix (v2):
+      Delay is now recorded when the emergency lane first receives green service
+      (vehicles actually discharged), not when the internal timer hits zero.
+      This gives accurate latency in simulator steps.
     """
 
     def __init__(self, cfg: EnvConfig) -> None:
@@ -95,7 +103,9 @@ class TrafficSimulator:
         self._step: int = 0
         self._total_phase_switches: int = 0
         self._emergency_delays: List[float] = []
-        self._active_emergency_arrivals: List[Dict] = []  # tracking
+        # Explicit event log: {arrival_step, served_step, latency_steps, etype, iid, lane_id}
+        self._served_emergency_events: List[Dict] = []
+        self._active_emergency_arrivals: List[Dict] = []  # pending (not yet served)
 
     # ------------------------------------------------------------------
     # Public API
@@ -108,6 +118,7 @@ class TrafficSimulator:
         self._step = 0
         self._total_phase_switches = 0
         self._emergency_delays = []
+        self._served_emergency_events = []
         self._active_emergency_arrivals = []
         self._intersections = [
             self._make_intersection(i) for i in range(self.cfg.n_intersections)
@@ -165,6 +176,13 @@ class TrafficSimulator:
     def step_count(self) -> int:
         return self._step
 
+    def get_served_emergency_events(self) -> List[Dict]:
+        """Return explicit log of emergency events with accurate latency."""
+        return list(self._served_emergency_events)
+
+    def get_emergency_delays(self) -> List[float]:
+        return list(self._emergency_delays)
+
     # ------------------------------------------------------------------
     # Intersection construction
     # ------------------------------------------------------------------
@@ -207,7 +225,11 @@ class TrafficSimulator:
                 inter.next_phase = None
                 inter.phase_timer = 0
 
-        # 5. Service green lanes
+        # Track ALL_RED steps
+        if inter.phase == PhaseEnum.ALL_RED and inter.yellow_remaining == 0:
+            inter.all_red_steps += 1
+
+        # 5. Service green lanes (also records emergency service events)
         spillback_occurred = self._service_lanes(inter)
         if spillback_occurred:
             inter.spillback_count += 1
@@ -229,16 +251,36 @@ class TrafficSimulator:
         inter.total_wait += total_wait_this_step
         inter.phase_timer += 1
 
-        # 7. Emergency timer countdown
+        # 7. Emergency timer countdown (only clear, don't record delay here)
         for lane in inter.lanes:
             if lane.emergency != EmergencyType.NONE and lane.emergency_timer > 0:
                 lane.emergency_timer -= 1
                 if lane.emergency_timer == 0:
-                    # Emergency vehicle cleared — record delay
-                    # Delay = steps it was queued waiting (starvation_timer proxy)
-                    delay = float(lane.starvation_timer) * self.sim.dt
-                    self._emergency_delays.append(delay)
+                    # Emergency vehicle has physically cleared — just reset state
+                    # (delay was already recorded in _service_lanes when it got green)
+                    if lane.emergency_arrival_step >= 0:
+                        # If never served (no green during entire presence), record max delay
+                        key = f"{inter.iid}_{lane.lane_id}"
+                        served_keys = {
+                            f"{ev['iid']}_{ev['lane_id']}"
+                            for ev in self._served_emergency_events
+                            if ev.get("arrival_step") == lane.emergency_arrival_step
+                        }
+                        if key not in served_keys:
+                            latency = self._step - lane.emergency_arrival_step
+                            delay = float(latency) * self.sim.dt
+                            self._emergency_delays.append(delay)
+                            self._served_emergency_events.append({
+                                "iid": inter.iid,
+                                "lane_id": lane.lane_id,
+                                "etype": int(lane.emergency),
+                                "arrival_step": lane.emergency_arrival_step,
+                                "served_step": None,   # never served green
+                                "latency_steps": latency,
+                                "served": False,
+                            })
                     lane.emergency = EmergencyType.NONE
+                    lane.emergency_arrival_step = -1
                     lane.starvation_timer = 0
 
         return {
@@ -247,6 +289,7 @@ class TrafficSimulator:
             "wait": total_wait_this_step,
             "spillback": spillback_occurred,
             "phase_switched": switched,
+            "all_red_steps": inter.all_red_steps,
             "lanes": [
                 {
                     "lane_id": l.lane_id,
@@ -295,8 +338,9 @@ class TrafficSimulator:
             )[0]
             lane.emergency = etype
             lane.emergency_timer = self.sim.emergency_clear_steps
+            lane.emergency_arrival_step = self._step
             lane.queue = min(lane.queue + 1, self.sim.max_queue_per_lane)
-            # Track emergency arrival for delay measurement
+            # Track emergency arrival
             self._active_emergency_arrivals.append({
                 "arrival_step": self._step,
                 "intersection": inter.iid,
@@ -340,7 +384,12 @@ class TrafficSimulator:
     # ------------------------------------------------------------------
 
     def _service_lanes(self, inter: _Intersection) -> bool:
-        """Release vehicles from green lanes. Returns True if spillback."""
+        """Release vehicles from green lanes. Returns True if spillback.
+
+        FIX v2: When an emergency lane receives its first green service,
+        record the accurate latency (current_step - arrival_step) immediately.
+        This is the definitive delay measurement used by graders and analytics.
+        """
         if inter.yellow_remaining > 0:
             return False  # no service during yellow
 
@@ -354,6 +403,34 @@ class TrafficSimulator:
             lane.queue -= released
             lane.throughput_this_step += released
             inter.total_throughput += released
+
+            # --- Emergency first-service detection ---
+            if (
+                lane.emergency != EmergencyType.NONE
+                and lane.emergency_arrival_step >= 0
+                and released > 0
+            ):
+                # Check not already recorded for this arrival
+                already_served = any(
+                    ev["iid"] == inter.iid
+                    and ev["lane_id"] == lane.lane_id
+                    and ev["arrival_step"] == lane.emergency_arrival_step
+                    and ev.get("served") is True
+                    for ev in self._served_emergency_events
+                )
+                if not already_served:
+                    latency = self._step - lane.emergency_arrival_step
+                    delay = float(latency) * self.sim.dt
+                    self._emergency_delays.append(delay)
+                    self._served_emergency_events.append({
+                        "iid": inter.iid,
+                        "lane_id": lane.lane_id,
+                        "etype": int(lane.emergency),
+                        "arrival_step": lane.emergency_arrival_step,
+                        "served_step": self._step,
+                        "latency_steps": latency,
+                        "served": True,
+                    })
 
             # Check if downstream overflow would cause spillback
             if lane.queue >= int(self.sim.max_queue_per_lane * self.sim.spillback_threshold):
@@ -446,6 +523,7 @@ class TrafficSimulator:
             total_throughput=inter.total_throughput,
             total_wait=inter.total_wait,
             spillback_count=inter.spillback_count,
+            all_red_steps=inter.all_red_steps,
         )
 
     # ------------------------------------------------------------------
@@ -455,5 +533,3 @@ class TrafficSimulator:
     def get_intersections_raw(self) -> List[_Intersection]:
         return self._intersections
 
-    def get_emergency_delays(self) -> List[float]:
-        return list(self._emergency_delays)

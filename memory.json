@@ -1,0 +1,473 @@
+{
+  "good_decisions": [
+    {
+      "episode": 5,
+      "step": 11,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 11) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 6%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step10: action=[1], reward=0.3808 | === TRAFFIC STATE (Episode 5, Step 10",
+      "action": [
+        1
+      ],
+      "reward": 0.4425,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 12,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 12) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 8%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[1], reward=0.4425 | === TRAFFIC STATE (Episode 5, Step 11",
+      "action": [
+        1
+      ],
+      "reward": 0.4125,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 13,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 13) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 10%)\n    \u26a0 YELLOW TRANSITION in progress \u2014 do NOT switch now\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[",
+      "action": [
+        0
+      ],
+      "reward": 0.3825,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 10,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 10) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.08(LOW)]\n    Phase: NS_GREEN  (timer: 5%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step4: action=[1], reward=0.3413 | === TRAFFIC STATE (Episode 5, Step 4) ",
+      "action": [
+        1
+      ],
+      "reward": 0.3808333333333333,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 15,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 15) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 1%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[1], reward=0.4425 | === TRAFFIC STATE (Episode 5, Step 11",
+      "action": [
+        1
+      ],
+      "reward": 0.3683333333333334,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 17,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 17) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 5%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[1], reward=0.4425 | === TRAFFIC STATE (Episode 5, Step 11",
+      "action": [
+        1
+      ],
+      "reward": 0.35416666666666674,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 14,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 14) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 11%)\n    \u26a0 YELLOW TRANSITION in progress \u2014 do NOT switch now\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[",
+      "action": [
+        0
+      ],
+      "reward": 0.3525,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 4,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 4) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.05(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 6%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep4/Step17: action=[1], reward=0.2325 | === TRAFFIC STATE (Episode 4, Step 17)",
+      "action": [
+        1
+      ],
+      "reward": 0.34125000000000005,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 16,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 16) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 3%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[1], reward=0.4425 | === TRAFFIC STATE (Episode 5, Step 11",
+      "action": [
+        1
+      ],
+      "reward": 0.3383333333333334,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 7,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 7) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.08(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 11%)\n    \u26a0 YELLOW TRANSITION in progress \u2014 do NOT switch now\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step4: action=[1]",
+      "action": [
+        0
+      ],
+      "reward": 0.33083333333333337,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 5,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 5) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.08(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 8%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step4: action=[1], reward=0.3413 | === TRAFFIC STATE (Episode 5, Step 4) =",
+      "action": [
+        1
+      ],
+      "reward": 0.3225,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 18,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 18) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 6%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[1], reward=0.4425 | === TRAFFIC STATE (Episode 5, Step 11",
+      "action": [
+        1
+      ],
+      "reward": 0.3154166666666668,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 6,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 6) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.08(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 10%)\n    \u26a0 YELLOW TRANSITION in progress \u2014 do NOT switch now\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step4: action=[1]",
+      "action": [
+        0
+      ],
+      "reward": 0.30375,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 8,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 8) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.08(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 1%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step4: action=[1], reward=0.3413 | === TRAFFIC STATE (Episode 5, Step 4) =",
+      "action": [
+        1
+      ],
+      "reward": 0.2995833333333333,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 19,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 19) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.12(LOW), W=0.10(LOW)]\n    Phase: NS_GREEN  (timer: 8%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step11: action=[1], reward=0.4425 | === TRAFFIC STATE (Episode 5, Step 11",
+      "action": [
+        1
+      ],
+      "reward": 0.2816666666666668,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 9,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 9) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.10(LOW), W=0.08(LOW)]\n    Phase: NS_GREEN  (timer: 3%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep5/Step4: action=[1], reward=0.3413 | === TRAFFIC STATE (Episode 5, Step 4) =",
+      "action": [
+        1
+      ],
+      "reward": 0.2733333333333333,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 4,
+      "step": 17,
+      "situation": "=== TRAFFIC STATE (Episode 4, Step 17) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.08(LOW), W=0.03(LOW)]\n    Phase: NS_GREEN  (timer: 5%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep1/Step7: action=[0], reward=0.1888 | === TRAFFIC STATE (Episode 1, Step 7) ",
+      "action": [
+        1
+      ],
+      "reward": 0.2325,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 3,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 3) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.05(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 5%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep4/Step17: action=[1], reward=0.2325 | === TRAFFIC STATE (Episode 4, Step 17)",
+      "action": [
+        1
+      ],
+      "reward": 0.2275,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 4,
+      "step": 18,
+      "situation": "=== TRAFFIC STATE (Episode 4, Step 18) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.08(LOW), W=0.03(LOW)]\n    Phase: NS_GREEN  (timer: 6%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep4/Step17: action=[1], reward=0.2325 | === TRAFFIC STATE (Episode 4, Step 17",
+      "action": [
+        1
+      ],
+      "reward": 0.21375000000000002,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    },
+    {
+      "episode": 5,
+      "step": 2,
+      "situation": "=== TRAFFIC STATE (Episode 5, Step 2) ===\n  Intersection 0:\n    Queues: [N=0.00(LOW), S=0.00(LOW), E=0.00(LOW), W=0.05(LOW)]\n    Phase: NS_GREEN  (timer: 3%)\n\n=== LEARNED STRATEGY (from memory) ===\n\u2705 What worked well:\n  \u2022 Ep4/Step17: action=[1], reward=0.2325 | === TRAFFIC STATE (Episode 4, Step 17)",
+      "action": [
+        1
+      ],
+      "reward": 0.19666666666666668,
+      "tags": [
+        "low_queue",
+        "ew_dominant"
+      ],
+      "risk_level": "unknown",
+      "went_wrong": ""
+    }
+  ],
+  "bad_decisions": [],
+  "episode_summaries": [
+    {
+      "episode": 1,
+      "total_reward": 2.2237500000000003,
+      "n_steps": 20,
+      "avg_reward": 0.11118750000000002,
+      "grader_score": 0.21671875,
+      "key_lessons": [
+        "Very low switch rate: phase may have been held too long, causing starvation on some lanes.",
+        "Score was low. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": null,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 2,
+      "total_reward": 1.3483333333333332,
+      "n_steps": 20,
+      "avg_reward": 0.06741666666666665,
+      "grader_score": 0.23308035714285713,
+      "key_lessons": [
+        "Score was low. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": 0.016361607142857143,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 3,
+      "total_reward": 0.9625000000000002,
+      "n_steps": 20,
+      "avg_reward": 0.048125000000000015,
+      "grader_score": 0.2329464285714286,
+      "key_lessons": [
+        "Score was low. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": -0.000133928571428521,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 4,
+      "total_reward": 2.526666666666667,
+      "n_steps": 20,
+      "avg_reward": 0.12633333333333335,
+      "grader_score": 0.2501785714285714,
+      "key_lessons": [
+        "Score was low. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": 0.017232142857142807,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 5,
+      "total_reward": 6.044166666666668,
+      "n_steps": 20,
+      "avg_reward": 0.3022083333333334,
+      "grader_score": 0.27669642857142857,
+      "key_lessons": [
+        "Score was low. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": 0.02651785714285715,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 1,
+      "total_reward": 9.662869791666669,
+      "n_steps": 20,
+      "avg_reward": 0.4831434895833334,
+      "grader_score": 0.1460673112972338,
+      "key_lessons": [
+        "Very low switch rate \u2014 phase held too long, starvation risk.",
+        "Low score. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": -0.13062911727419477,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 2,
+      "total_reward": 9.126,
+      "n_steps": 20,
+      "avg_reward": 0.4563,
+      "grader_score": 0.1430331252429497,
+      "key_lessons": [
+        "Very low switch rate \u2014 phase held too long, starvation risk.",
+        "Low score. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": -0.0030341860542840993,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    },
+    {
+      "episode": 3,
+      "total_reward": 9.369750000000002,
+      "n_steps": 20,
+      "avg_reward": 0.46848750000000006,
+      "grader_score": 0.1435307347201761,
+      "key_lessons": [
+        "Very low switch rate \u2014 phase held too long, starvation risk.",
+        "Low score. Focus on throughput: serve the direction with the largest combined queue."
+      ],
+      "improvement_vs_prev": 0.0004976094772264072,
+      "violations": [],
+      "starvation_found": false,
+      "emergency_neglect": false
+    }
+  ],
+  "situational_patterns": {
+    "low_queue": {
+      "best_action": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "best_reward": 0.5626041666666667,
+      "situation": "STATE:\n  I0: queues[NSEW]=.... NS=0.00 EW=0.00 phase=NS_GREEN eq\n  I1: queues[NSEW]=.... NS=0.00 EW=0.00 phase=NS_GREEN eq\n  I2: queues[NSEW]=.... NS=0.00 EW=0.00 phase=NS_GREEN eq\n  I3: queues[NSEW]=",
+      "episode": 2,
+      "step": 0
+    },
+    "balanced": {
+      "best_action": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "best_reward": 0.5626041666666667,
+      "situation": "STATE:\n  I0: queues[NSEW]=.... NS=0.00 EW=0.00 phase=NS_GREEN eq\n  I1: queues[NSEW]=.... NS=0.00 EW=0.00 phase=NS_GREEN eq\n  I2: queues[NSEW]=.... NS=0.00 EW=0.00 phase=NS_GREEN eq\n  I3: queues[NSEW]=",
+      "episode": 2,
+      "step": 0
+    },
+    "ew_dominant": {
+      "best_action": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "best_reward": 0.5490781250000001,
+      "situation": "STATE:\n  I0: queues[NSEW]=.... NS=0.00 EW=0.08 phase=NS_GREEN eq\n  I1: queues[NSEW]=.... NS=0.00 EW=0.03 phase=NS_GREEN eq\n  I2: queues[NSEW]=.... NS=0.00 EW=0.05 phase=NS_GREEN eq\n  I3: queues[NSEW]=",
+      "episode": 1,
+      "step": 2
+    },
+    "medium_queue": {
+      "best_action": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "best_reward": 0.490390625,
+      "situation": "STATE:\n  I0: queues[NSEW]=..LL NS=0.00 EW=0.48 phase=NS_GREEN EW>\n  I1: queues[NSEW]=..L. NS=0.00 EW=0.28 phase=NS_GREEN EW>\n  I2: queues[NSEW]=...L NS=0.00 EW=0.20 phase=NS_GREEN EW>\n  I3: queues[NSE",
+      "episode": 1,
+      "step": 17
+    }
+  }
+}

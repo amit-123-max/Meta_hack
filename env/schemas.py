@@ -1,4 +1,4 @@
-"""Typed schemas for TrafficSignalEnv — Observation, Action, Reward, State."""
+"""Typed schemas for TrafficSignalEnv — Observation, Action, Reward, State, Feedback."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -66,6 +66,7 @@ class IntersectionState:
     total_throughput: int = 0
     total_wait: float = 0.0
     spillback_count: int = 0
+    all_red_steps: int = 0     # total steps this intersection spent in ALL_RED
 
 
 @dataclass
@@ -75,7 +76,7 @@ class TrafficState:
     intersections: List[IntersectionState]
     global_throughput: int
     global_avg_wait: float
-    episode_emergency_delays: List[float]  # per-emergency response time
+    episode_emergency_delays: List[float]  # per-emergency response time (accurate)
     phase_switches: int                     # total across all intersections
     done: bool
 
@@ -193,4 +194,111 @@ class TrafficReward:
             "starvation_penalty": self.starvation_penalty,
             "fairness_bonus": self.fairness_bonus,
             "total": self.total,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Structured Feedback (Part B)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class StepFeedback:
+    """Compact, deterministic per-step feedback from env to agent.
+
+    Included in info["step_feedback"] on every env.step().
+    All fields are deterministic given the same trajectory.
+    """
+    step: int
+    risk_level: str                     # "low" | "medium" | "high" | "critical"
+    dominant_queue: str                 # "NS" | "EW" | "balanced"
+    emergency_active: bool
+    emergency_type: str                 # e.g. "AMBULANCE", "NONE"
+    spillback_active: bool
+    starvation_detected: bool
+    all_red_abused: bool                # True if ALL_RED chosen without justification
+    last_action_sensible: bool          # did action serve dominant/emergency need?
+    suggested_action: List[int]         # oracle heuristic recommendation
+    reward_breakdown: Dict[str, float]  # component breakdown
+    went_right: str                     # ≤80 char human-readable positive
+    went_wrong: str                     # ≤80 char human-readable negative
+    confidence: float                   # 1.0 = fully deterministic
+
+    def to_compact_str(self) -> str:
+        """Token-efficient string for LLM prompt injection (≤60 tokens)."""
+        em = f"emerg={self.emergency_type}" if self.emergency_active else "emerg=none"
+        issues = []
+        if not self.last_action_sensible:
+            issues.append("bad_action")
+        if self.starvation_detected:
+            issues.append("starving")
+        if self.spillback_active:
+            issues.append("spillback")
+        if self.all_red_abused:
+            issues.append("all_red_abuse")
+        issue_str = ",".join(issues) if issues else "ok"
+        rec = ",".join(str(a) for a in self.suggested_action)
+        return (
+            f"FEEDBACK[{self.step}]: risk={self.risk_level} {em} "
+            f"dom={self.dominant_queue} issues={issue_str} rec=[{rec}]"
+        )
+
+    def to_dict(self) -> Dict:
+        return {
+            "step": self.step,
+            "risk_level": self.risk_level,
+            "dominant_queue": self.dominant_queue,
+            "emergency_active": self.emergency_active,
+            "emergency_type": self.emergency_type,
+            "spillback_active": self.spillback_active,
+            "starvation_detected": self.starvation_detected,
+            "all_red_abused": self.all_red_abused,
+            "last_action_sensible": self.last_action_sensible,
+            "suggested_action": self.suggested_action,
+            "went_right": self.went_right,
+            "went_wrong": self.went_wrong,
+            "confidence": self.confidence,
+            "reward_breakdown": self.reward_breakdown,
+        }
+
+
+@dataclass
+class EpisodeFeedback:
+    """Compact episode-level feedback produced at episode end.
+
+    Included in info["episode_feedback"] when done=True.
+    Available via env.build_episode_feedback() at any time.
+    """
+    n_steps: int
+    avg_wait_per_lane: float
+    total_throughput: int
+    throughput_per_step: float
+    emergency_events: List[Dict]         # each: {type, arrival, served, latency_steps}
+    spillback_summary: Dict              # {mean_rate, max_rate, n_overflow_steps}
+    violations: List[str]                # string descriptions of detected faults
+    fairness_score: float                # Jain's index, episode-level [0,1]
+    starvation_intersections: List[int]  # intersection IDs that were starved
+    phase_churn_rate: float              # phase switches / (steps * n_intersections)
+    all_red_rate: float                  # fraction of steps spent in ALL_RED
+    best_step: int                       # step with highest reward
+    worst_step: int                      # step with lowest reward
+    lessons: List[str]                   # ≤5 concise actionable lessons
+    score_breakdown: Dict[str, float]    # partial scores used by grader
+
+    def to_dict(self) -> Dict:
+        return {
+            "n_steps": self.n_steps,
+            "avg_wait_per_lane": self.avg_wait_per_lane,
+            "total_throughput": self.total_throughput,
+            "throughput_per_step": self.throughput_per_step,
+            "emergency_events": self.emergency_events,
+            "spillback_summary": self.spillback_summary,
+            "violations": self.violations,
+            "fairness_score": self.fairness_score,
+            "starvation_intersections": self.starvation_intersections,
+            "phase_churn_rate": self.phase_churn_rate,
+            "all_red_rate": self.all_red_rate,
+            "best_step": self.best_step,
+            "worst_step": self.worst_step,
+            "lessons": self.lessons,
+            "score_breakdown": self.score_breakdown,
         }

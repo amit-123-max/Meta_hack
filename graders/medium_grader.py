@@ -1,88 +1,199 @@
-"""Medium-task grader — 2×2 grid with congestion propagation.
+"""Medium-task grader — 4-intersection grid, congestion propagation.
 
-Difficulty calibration:
-  DIFFICULTY_CAP = 0.42 — guarantees easy ≥ medium at any trajectory length.
-  This ensures: easy (cap ~0.75) > medium (cap 0.42) > hard (cap 0.36).
+Architecture: hybrid gate × (process + outcome)
+================================================
 
-  Cap was lowered from 0.60 → 0.42 (factor 0.70) so that even a 20-step
-  short-horizon evaluation satisfies the monotonicity constraint.
+  final_score = gate_factor
+                × (W_PROCESS * mean(process_scores)
+                   + W_OUTCOME * outcome_score)
 
-  With baseline rule-based agent (tp≈6.4/step, queue≈1.7/lane, spill≈0):
-    raw_score ≈ 0.82  →  final = 0.42 × 0.82 ≈ 0.34
+  gate_factor = safety_gate(all_red, starvation, spillback_overflow)
+              × anti_exploit_penalty
+
+  outcome_score = weighted_sum(
+      0.38 * throughput_score,
+      0.26 * spillback_score,
+      0.20 * queue_score,
+      0.10 * fairness_score,   # Jain's, episode-level
+      0.06 * smoothness_score,
+  )
+
+Safety gates (multiplicative)
+------------------------------
+  ALL_RED rate > 50% → gate = 0.20
+  ALL_RED rate > 30% → gate ×= 0.55
+  Any intersection starved (< 2% expected throughput) → gate ×= 0.70 per starved
+  Mean spillback rate > 0.75 → gate ×= 0.60
+
+Process / outcome mix
+---------------------
+  W_PROCESS = 0.25
+  W_OUTCOME = 0.75
+
+Difficulty ceiling
+------------------
+  DIFFICULTY_CEIL = 0.72   (soft upper bound on final score)
+  Applied via tanh-like stretch: score is mapped through a soft cap
+  rather than a flat multiplier, preserving gradient in [0, CEIL].
+
+Target ranges
+-------------
+  Rule-based baseline: ≈ 0.35–0.50
+  Good LLM policy:     ≈ 0.45–0.60
+  Random policy:       ≈ 0.15–0.32
+  Score always in [0, 1].
 """
 from __future__ import annotations
 
+import math
 import statistics
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from graders.base_grader import BaseGrader
 
-_N             = 4
-_TP_NORM_MAX   = 7.0    # 4 inters × λ=0.40 arrival ceiling
-_QUEUE_MAX     = 8.0    # avg queue/lane: >8 = badly congested
-_SPILLBACK_MAX = 0.60
-_SWITCH_MAX    = 0.25
-DIFFICULTY_CAP = 0.42   # hard ceiling (lowered from 0.60 for monotonicity)
+# Normalization defaults
+_TP_DEFAULT_LO    = 0.0
+_TP_DEFAULT_HI    = 10.0   # 4 intersections, good policy
+_QUEUE_DEFAULT_LO = 0.0
+_QUEUE_DEFAULT_HI = 8.0
+_SPILLBACK_DEFAULT_HI = 0.75
+_SWITCH_DEFAULT_HI    = 0.30
 
-W_TP       = 0.35
-W_SPILLBACK= 0.27
-W_QUEUE    = 0.22
+N_INTERSECTIONS = 4
+
+# Process / outcome blend
+W_PROCESS = 0.25
+W_OUTCOME = 0.75
+
+# Outcome sub-weights (sum = 1.0)
+W_TP       = 0.38
+W_SPILLBACK = 0.26
+W_QUEUE    = 0.20
 W_FAIRNESS = 0.10
-W_SWITCH   = 0.06
+W_SMOOTH   = 0.06
+
+# Soft difficulty ceiling
+DIFFICULTY_CEIL = 0.72
+
+
+def _soft_cap(score: float, ceiling: float) -> float:
+    """Soft cap: approach ceiling asymptotically, full signal below it."""
+    if ceiling <= 0.0:
+        return 0.0
+    # scores near ceiling approach it smoothly; scores << ceiling are linear
+    # f(x) = ceil * (1 - exp(-3x/ceil))  — maps [0,∞) onto [0, ceil)
+    return ceiling * (1.0 - math.exp(-3.0 * score / ceiling))
 
 
 class MediumGrader(BaseGrader):
-    """Deterministic grader for Task 2 (Medium). Target baseline ≈ 0.49."""
+    """Deterministic grader for Task 2 (Medium).
+
+    Target baseline (rule-based): ≈ 0.35–0.50.
+    Exploit-resistant via safety gate + anti-exploit layer.
+    """
 
     def grade(self, trajectory: List[Dict[str, Any]]) -> float:
         if not trajectory:
             return 0.0
 
-        throughputs: List[float] = []
-        avg_queues:  List[float] = []
-        spill_steps: List[float] = []
-        fairness:    List[float] = []
         n_steps = len(trajectory)
 
-        for step in trajectory:
-            snap = step.get("state_snapshot", {})
-            throughputs.append(float(snap.get("global_throughput", 0)))
-            avg_queues.append(float(snap.get("global_avg_wait", _QUEUE_MAX)))
+        # ------------------------------------------------------------------
+        # 1. Safety gate
+        # ------------------------------------------------------------------
+        all_red = self._all_red_rate(trajectory, N_INTERSECTIONS)
+        osc     = self._oscillation_rate(trajectory)
+        starv   = self._starvation_fraction(trajectory, N_INTERSECTIONS)
+        spill   = self._mean_spillback_rate(trajectory, N_INTERSECTIONS)
 
-            inter_tps, step_spill = [], 0
+        gate = 1.0
+        if all_red > 0.50:
+            gate *= 0.20
+        elif all_red > 0.30:
+            gate *= 0.55
+        elif all_red > 0.15:
+            gate *= 0.80
+
+        # Starvation gate (per starved intersection)
+        if starv > 0.0:
+            n_starved = int(round(starv * N_INTERSECTIONS))
+            gate *= max(0.40, 1.0 - 0.15 * n_starved)
+
+        # Severe spillback gate
+        if spill > 0.75:
+            gate *= 0.60
+        elif spill > 0.55:
+            gate *= 0.80
+
+        if osc > 0.70:
+            gate *= 0.55
+        elif osc > 0.50:
+            gate *= 0.80
+
+        exploit_penalty = self._anti_exploit_penalty(trajectory, N_INTERSECTIONS)
+        gate = max(0.0, min(1.0, gate * exploit_penalty))
+
+        if gate == 0.0:
+            return 0.0
+
+        # ------------------------------------------------------------------
+        # 2. Process score
+        # ------------------------------------------------------------------
+        process_scores = self._compute_process_scores(trajectory, N_INTERSECTIONS)
+        process_score  = self._robust_mean(process_scores, default=0.5)
+
+        # ------------------------------------------------------------------
+        # 3. Outcome score
+        # ------------------------------------------------------------------
+        throughputs:  List[float] = []
+        worst_queues: List[float] = []
+
+        for step_data in trajectory:
+            snap = step_data.get("state_snapshot", {})
+            throughputs.append(float(snap.get("global_throughput", 0.0)))
+
+            q_hi_default = _QUEUE_DEFAULT_HI
+            step_worst_q = 0.0
             for inter in snap.get("intersections", []):
-                step_spill += int(inter.get("spillback", 0))
-                inter_tps.append(float(inter.get("throughput", 0)))
+                qs = inter.get("queues", [])
+                if qs:
+                    local_worst = max(float(q) for q in qs)
+                    step_worst_q = max(step_worst_q, local_worst)
+            worst_queues.append(step_worst_q)
 
-            spill_steps.append(step_spill / max(_N, 1))
+        tp_lo, tp_hi = self._get_bounds("tp", _TP_DEFAULT_LO, _TP_DEFAULT_HI)
+        tp_s = self._normalise(self._robust_mean(throughputs, 0.0), tp_lo, tp_hi)
 
-            if len(inter_tps) > 1 and max(inter_tps) > 0:
-                sq = sum(t * t for t in inter_tps)
-                s  = sum(inter_tps)
-                fairness.append(min(1.0, s * s / max(_N * sq, 1e-9)))
+        q_lo, q_hi = self._get_bounds("queue", _QUEUE_DEFAULT_LO, _QUEUE_DEFAULT_HI)
+        q_s = self._invert(
+            self._normalise(self._robust_mean(worst_queues, q_hi), q_lo, q_hi)
+        )
 
-        tp_s   = self._normalise(statistics.mean(throughputs) if throughputs else 0.0,
-                                 0.0, _TP_NORM_MAX)
-        q_s    = self._invert(self._normalise(
-                    statistics.mean(avg_queues) if avg_queues else _QUEUE_MAX,
-                    0.0, _QUEUE_MAX))
-        sp_s   = self._invert(self._normalise(
-                    statistics.mean(spill_steps) if spill_steps else 0.0,
-                    0.0, _SPILLBACK_MAX))
-        fair_s = statistics.mean(fairness) if fairness else 0.5
+        sp_lo, sp_hi = self._get_bounds("spillback", 0.0, _SPILLBACK_DEFAULT_HI)
+        sp_s = self._invert(
+            self._normalise(spill, sp_lo, sp_hi)
+        )
 
-        final_sw   = int(trajectory[-1].get("state_snapshot", {}).get("phase_switches", 0))
-        switch_pen = self._normalise(final_sw / max(n_steps * _N, 1), 0.0, _SWITCH_MAX)
+        fair_s = self._jains_fairness_episode(trajectory)
 
-        # Starvation guard
-        inter_totals: Dict[int, float] = {}
-        for step in trajectory:
-            for inter in step.get("state_snapshot", {}).get("intersections", []):
-                iid = inter.get("id", 0)
-                inter_totals[iid] = inter_totals.get(iid, 0.0) + float(inter.get("throughput", 0))
-        starvation = sum(0.15 for v in inter_totals.values() if v < 1.0)
+        final_sw = int(trajectory[-1].get("state_snapshot", {}).get("phase_switches", 0))
+        switch_rate = final_sw / max(n_steps * N_INTERSECTIONS, 1)
+        smooth_s = self._invert(
+            self._normalise(switch_rate, 0.0, _SWITCH_DEFAULT_HI)
+        )
 
-        raw = (W_TP * tp_s + W_SPILLBACK * sp_s + W_QUEUE * q_s
-               + W_FAIRNESS * fair_s - W_SWITCH * switch_pen - starvation)
+        outcome_score = max(0.0, min(1.0,
+            W_TP        * tp_s
+            + W_SPILLBACK * sp_s
+            + W_QUEUE    * q_s
+            + W_FAIRNESS * fair_s
+            + W_SMOOTH   * smooth_s
+        ))
 
-        return float(max(0.0, min(1.0, DIFFICULTY_CAP * max(0.0, raw))))
+        # ------------------------------------------------------------------
+        # 4. Combined score with soft difficulty ceiling
+        # ------------------------------------------------------------------
+        raw = W_PROCESS * process_score + W_OUTCOME * outcome_score
+        capped = _soft_cap(raw, DIFFICULTY_CEIL)
+        final  = gate * capped
+        return float(max(0.0, min(1.0, final)))

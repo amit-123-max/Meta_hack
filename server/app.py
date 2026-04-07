@@ -29,6 +29,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
+from dotenv import load_dotenv
+load_dotenv(override=False)  # CRITICAL: never override grader-injected env vars
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.task_configs import easy_config, hard_config, medium_config
